@@ -281,18 +281,11 @@ where
             .borrow_mut()
             .insert(pt.hasher.digest(&encoded), encoded);
 
-        let mut keys = Vec::with_capacity(pt.cache.borrow().len());
-        let mut values = Vec::with_capacity(pt.cache.borrow().len());
-        for (k, v) in pt.cache.borrow_mut().drain() {
-            keys.push(k.to_vec());
-            values.push(v);
-        }
-
         // store data in backup db
         pt.backup_db
             .clone()
             .unwrap()
-            .insert_batch(keys, values)
+            .insert_map(&mut pt.cache.borrow_mut())
             .map_err(|e| TrieError::DB(e.to_string()))?;
         pt.backup_db
             .clone()
@@ -707,15 +700,8 @@ where
             encoded
         };
 
-        let mut keys = Vec::with_capacity(self.cache.borrow().len());
-        let mut values = Vec::with_capacity(self.cache.borrow().len());
-        for (k, v) in self.cache.borrow_mut().drain() {
-            keys.push(k.to_vec());
-            values.push(v);
-        }
-
         self.db
-            .insert_batch(keys, values)
+            .insert_map(&mut self.cache.borrow_mut())
             .map_err(|e| TrieError::DB(e.to_string()))?;
 
         let removed_keys: Vec<Vec<u8>> = self

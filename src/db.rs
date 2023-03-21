@@ -32,6 +32,14 @@ pub trait DB: Send + Sync {
         Ok(())
     }
 
+    /// Insert a map into the cache.
+    fn insert_map(&self, kv: &mut HashMap<Vec<u8>, Vec<u8>>) -> Result<(), Self::Error> {
+        for (key, value) in kv.drain() {
+            self.insert(key, value)?;
+        }
+        Ok(())
+    }
+
     /// Remove a batch of data into the cache.
     fn remove_batch(&self, keys: &[Vec<u8>]) -> Result<(), Self::Error> {
         for key in keys {
