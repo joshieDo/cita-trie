@@ -1,5 +1,5 @@
 use std::cell::RefCell;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashSet};
 use std::rc::Rc;
 use std::sync::Arc;
 
@@ -64,7 +64,7 @@ where
     hasher: Arc<H>,
     backup_db: Option<Arc<D>>,
 
-    cache: RefCell<HashMap<Vec<u8>, Vec<u8>>>,
+    cache: RefCell<BTreeMap<Vec<u8>, Vec<u8>>>,
     passing_keys: RefCell<HashSet<Vec<u8>>>,
     gen_keys: RefCell<HashSet<Vec<u8>>>,
 }
@@ -220,7 +220,7 @@ where
             root: Node::Empty,
             root_hash: hasher.digest(rlp::NULL_RLP.as_ref()),
 
-            cache: RefCell::new(HashMap::new()),
+            cache: RefCell::new(BTreeMap::new()),
             passing_keys: RefCell::new(HashSet::new()),
             gen_keys: RefCell::new(HashSet::new()),
 
@@ -237,7 +237,7 @@ where
                     root: Node::Empty,
                     root_hash: root.to_vec(),
 
-                    cache: RefCell::new(HashMap::new()),
+                    cache: RefCell::new(BTreeMap::new()),
                     passing_keys: RefCell::new(HashSet::new()),
                     gen_keys: RefCell::new(HashSet::new()),
 
@@ -264,7 +264,7 @@ where
             root: Node::Empty,
             root_hash: hasher.digest(rlp::NULL_RLP.as_ref()),
 
-            cache: RefCell::new(HashMap::new()),
+            cache: RefCell::new(BTreeMap::new()),
             passing_keys: RefCell::new(HashSet::new()),
             gen_keys: RefCell::new(HashSet::new()),
 
@@ -913,7 +913,7 @@ mod tests {
     use rand::distributions::Alphanumeric;
     use rand::seq::SliceRandom;
     use rand::{thread_rng, Rng};
-    use std::collections::{HashMap, HashSet};
+    use std::collections::{BTreeMap, HashSet};
     use std::sync::Arc;
 
     use hasher::{Hasher, HasherKeccak};
@@ -1154,7 +1154,7 @@ mod tests {
     fn iterator_trie() {
         let memdb = Arc::new(MemoryDB::new(true));
         let root1;
-        let mut kv = HashMap::new();
+        let mut kv = BTreeMap::new();
         kv.insert(b"test".to_vec(), b"test".to_vec());
         kv.insert(b"test1".to_vec(), b"test1".to_vec());
         kv.insert(b"test11".to_vec(), b"test2".to_vec());
@@ -1179,7 +1179,7 @@ mod tests {
 
         {
             let mut trie = PatriciaTrie::new(memdb.clone(), Arc::new(HasherKeccak::new()));
-            let mut kv2 = HashMap::new();
+            let mut kv2 = BTreeMap::new();
             kv2.insert(b"test".to_vec(), b"test11".to_vec());
             kv2.insert(b"test1".to_vec(), b"test12".to_vec());
             kv2.insert(b"test14".to_vec(), b"test13".to_vec());
