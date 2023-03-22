@@ -219,7 +219,20 @@ where
         Self {
             root: Node::Empty,
             root_hash: hasher.digest(rlp::NULL_RLP.as_ref()),
+            cache: RefCell::new(BTreeMap::new()),
+            passing_keys: RefCell::new(HashSet::new()),
+            gen_keys: RefCell::new(HashSet::new()),
 
+            db,
+            hasher,
+            backup_db: None,
+        }
+    }
+
+    pub fn new_with_hash(db: Arc<D>, hasher: Arc<H>, root_hash: Vec<u8>) -> Self {
+        Self {
+            root: Node::Empty,
+            root_hash,
             cache: RefCell::new(BTreeMap::new()),
             passing_keys: RefCell::new(HashSet::new()),
             gen_keys: RefCell::new(HashSet::new()),
