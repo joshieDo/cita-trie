@@ -46,6 +46,9 @@ pub trait Trie<D: DB, H: Hasher> {
         key: &[u8],
         proof: Vec<Vec<u8>>,
     ) -> TrieResult<Option<Vec<u8>>>;
+
+    /// Returns an approximation size of the trie in bytes.
+    fn size_hint(&self) -> usize;
 }
 
 #[derive(Debug)]
@@ -301,6 +304,11 @@ where
     D: DB,
     H: Hasher,
 {
+    /// Returns an approximation size of the trie in bytes.
+    fn size_hint(&self) -> usize {
+        self.root.size_hint()
+    }
+
     /// Returns the value for key stored in the trie.
     fn get(&self, key: &[u8]) -> TrieResult<Option<Vec<u8>>> {
         self.get_at(self.root.clone(), &Nibbles::from_raw(key.to_vec(), true))

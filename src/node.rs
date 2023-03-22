@@ -32,6 +32,28 @@ impl Node {
         let hash_node = Rc::new(RefCell::new(HashNode { hash }));
         Node::Hash(hash_node)
     }
+
+    pub fn size_hint(&self) -> usize {
+        match self {
+            Node::Empty => 1usize,
+            Node::Leaf(leaf) => leaf.borrow().value.len() + leaf.borrow().key.get_data().len(),
+            Node::Extension(ext) => {
+                ext.borrow().prefix.get_data().len() + ext.borrow().node.size_hint()
+            }
+            Node::Branch(bn) => {
+                let bn = bn.borrow();
+                let mut s = 0;
+                for c in &bn.children {
+                    s += c.size_hint();
+                }
+                if let Some(v) = &bn.value {
+                    s += v.len();
+                }
+                s
+            }
+            Node::Hash(h) => h.borrow().hash.len(),
+        }
+    }
 }
 
 #[derive(Debug)]
