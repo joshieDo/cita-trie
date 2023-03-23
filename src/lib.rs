@@ -18,7 +18,7 @@
 //!
 //!     let root = {
 //!         let mut trie = PatriciaTrie::new(Arc::clone(&memdb), Arc::clone(&hasher));
-//!         trie.insert(key.to_vec(), value.to_vec()).unwrap();
+//!         trie.insert(key, value.to_vec()).unwrap();
 //!
 //!         let v = trie.get(key).unwrap();
 //!         assert_eq!(Some(value.to_vec()), v);

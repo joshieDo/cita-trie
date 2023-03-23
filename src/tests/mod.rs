@@ -13,7 +13,7 @@ mod trie_tests {
         let memdb = Arc::new(MemoryDB::new(true));
         let mut trie = PatriciaTrie::new(Arc::clone(&memdb), Arc::new(HasherKeccak::new()));
         for (k, v) in data.into_iter() {
-            trie.insert(k.to_vec(), v.to_vec()).unwrap();
+            trie.insert(k, v.to_vec()).unwrap();
         }
         let r = trie.root().unwrap();
         let rs = format!("0x{}", hex::encode(r.clone()));
@@ -553,10 +553,9 @@ mod trie_tests {
     fn test_proof_basic() {
         let memdb = Arc::new(MemoryDB::new(true));
         let mut trie = PatriciaTrie::new(Arc::clone(&memdb), Arc::new(HasherKeccak::new()));
-        trie.insert(b"doe".to_vec(), b"reindeer".to_vec()).unwrap();
-        trie.insert(b"dog".to_vec(), b"puppy".to_vec()).unwrap();
-        trie.insert(b"dogglesworth".to_vec(), b"cat".to_vec())
-            .unwrap();
+        trie.insert(b"doe", b"reindeer".to_vec()).unwrap();
+        trie.insert(b"dog", b"puppy".to_vec()).unwrap();
+        trie.insert(b"dogglesworth", b"cat".to_vec()).unwrap();
         let root = trie.root().unwrap();
         let r = format!("0x{}", hex::encode(trie.root().unwrap()));
         assert_eq!(
@@ -630,12 +629,12 @@ mod trie_tests {
             let random_bytes: Vec<u8> = (0..rng.gen_range(2, 30))
                 .map(|_| rand::random::<u8>())
                 .collect();
-            trie.insert(random_bytes.to_vec(), random_bytes.clone())
+            trie.insert(random_bytes.as_slice(), random_bytes.clone())
                 .unwrap();
             keys.push(random_bytes.clone());
         }
         for k in keys.clone().into_iter() {
-            trie.insert(k.clone(), k.clone()).unwrap();
+            trie.insert(k.as_slice(), k.clone()).unwrap();
         }
         let root = trie.root().unwrap();
         for k in keys.into_iter() {
@@ -667,7 +666,7 @@ mod trie_tests {
     fn test_proof_one_element() {
         let memdb = Arc::new(MemoryDB::new(true));
         let mut trie = PatriciaTrie::new(Arc::clone(&memdb), Arc::new(HasherKeccak::new()));
-        trie.insert(b"k".to_vec(), b"v".to_vec()).unwrap();
+        trie.insert(b"k", b"v".to_vec()).unwrap();
         let root = trie.root().unwrap();
         let proof = trie.get_proof(b"k").unwrap();
         assert_eq!(proof.len(), 1);
