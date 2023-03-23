@@ -4,7 +4,7 @@
 //! ```rust
 //! use std::sync::Arc;
 //!
-//! use hasher::{Hasher, HasherKeccak}; // https://crates.io/crates/hasher
+//! use cita_trie::{Hasher, FixedHasherKeccak as HasherKeccak}; // https://crates.io/crates/hasher
 //!
 //! use cita_trie::MemoryDB;
 //! use cita_trie::{PatriciaTrie, Trie};
@@ -42,19 +42,19 @@ mod tests;
 
 mod db;
 mod errors;
+mod hasher;
 mod trie;
 
 pub use db::{MemoryDB, DB};
 pub use errors::{MemDBError, TrieError};
-pub use hasher::Hasher;
+pub use hasher::{FixedHasherKeccak, Hasher};
 pub use trie::{PatriciaTrie, Trie};
 pub use verify::verify_proof;
 
 mod verify {
     use std::sync::Arc;
 
-    use hasher::Hasher;
-
+    use crate::Hasher;
     use crate::{trie::TrieResult, MemoryDB, PatriciaTrie, Trie, TrieError, DB};
 
     pub fn verify_proof<H: Hasher>(
@@ -68,7 +68,7 @@ mod verify {
             let hash = hasher.digest(&node_encoded);
 
             if root_hash.eq(&hash) || node_encoded.len() >= H::LENGTH {
-                memdb.insert(hash, node_encoded).unwrap();
+                memdb.insert(hash.to_vec(), node_encoded).unwrap();
             }
         }
 

@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 use std::error::Error;
 use std::sync::Arc;
 
@@ -33,15 +33,16 @@ pub trait DB: Send + Sync {
     }
 
     /// Insert a map into the cache.
-    fn insert_map(&self, kv: &mut BTreeMap<Vec<u8>, Vec<u8>>) -> Result<(), Self::Error> {
-        while let Some((key, value)) = kv.pop_first() {
-            self.insert(key, value)?;
+    fn insert_map(&self, mut kv: Vec<([u8; 32], Vec<u8>)>) -> Result<(), Self::Error> {
+        kv.sort_by(|a, b| a.0.cmp(&b.0));
+        for (key, value) in kv {
+            self.insert(key.to_vec(), value)?;
         }
         Ok(())
     }
 
     /// Remove a batch of data into the cache.
-    fn remove_batch(&self, keys: &[Vec<u8>]) -> Result<(), Self::Error> {
+    fn remove_batch(&self, keys: &[[u8; 32]]) -> Result<(), Self::Error> {
         for key in keys {
             self.remove(key)?;
         }

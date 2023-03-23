@@ -4,9 +4,8 @@ mod trie_tests {
     use rand::Rng;
     use std::sync::Arc;
 
-    use hasher::HasherKeccak;
-
     use crate::db::MemoryDB;
+    use crate::hasher::FixedHasherKeccak as HasherKeccak;
     use crate::trie::{PatriciaTrie, Trie};
     use crate::verify_proof;
 

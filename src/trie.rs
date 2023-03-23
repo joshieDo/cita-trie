@@ -1,15 +1,15 @@
+use rlp::{Prototype, Rlp, RlpStream};
 use std::cell::RefCell;
-use std::collections::{BTreeMap, HashSet};
+use std::collections::HashSet;
+use std::convert::TryInto;
 use std::rc::Rc;
 use std::sync::Arc;
-
-use hasher::Hasher;
-use rlp::{Prototype, Rlp, RlpStream};
 
 use crate::db::{MemoryDB, DB};
 use crate::errors::TrieError;
 use crate::nibbles::Nibbles;
 use crate::node::{empty_children, BranchNode, Node};
+use crate::Hasher;
 
 pub type TrieResult<T> = Result<T, TrieError>;
 
@@ -64,9 +64,9 @@ where
     hasher: Arc<H>,
     backup_db: Option<Arc<D>>,
 
-    cache: RefCell<BTreeMap<Vec<u8>, Vec<u8>>>,
-    passing_keys: RefCell<HashSet<Vec<u8>>>,
-    gen_keys: RefCell<HashSet<Vec<u8>>>,
+    cache: RefCell<Vec<([u8; 32], Vec<u8>)>>,
+    passing_keys: RefCell<Vec<[u8; 32]>>,
+    gen_keys: RefCell<HashSet<[u8; 32]>>,
 }
 
 #[derive(Clone, Debug)]
@@ -170,7 +170,7 @@ where
                     }
 
                     (TraceStatus::Doing, Node::Hash(ref hash_node)) => {
-                        if let Ok(n) = self.trie.recover_from_db(&hash_node.borrow().hash.clone()) {
+                        if let Ok(n) = self.trie.recover_from_db(&hash_node.borrow().hash) {
                             self.nodes.pop();
                             self.nodes.push(n.into());
                         } else {
@@ -218,9 +218,9 @@ where
     pub fn new(db: Arc<D>, hasher: Arc<H>) -> Self {
         Self {
             root: Node::Empty,
-            root_hash: hasher.digest(rlp::NULL_RLP.as_ref()),
-            cache: RefCell::new(BTreeMap::new()),
-            passing_keys: RefCell::new(HashSet::new()),
+            root_hash: hasher.digest(rlp::NULL_RLP.as_ref()).to_vec(),
+            cache: RefCell::new(Vec::new()),
+            passing_keys: RefCell::new(Vec::new()),
             gen_keys: RefCell::new(HashSet::new()),
 
             db,
@@ -233,8 +233,8 @@ where
         Self {
             root: Node::Empty,
             root_hash,
-            cache: RefCell::new(BTreeMap::new()),
-            passing_keys: RefCell::new(HashSet::new()),
+            cache: RefCell::new(Vec::new()),
+            passing_keys: RefCell::new(Vec::new()),
             gen_keys: RefCell::new(HashSet::new()),
 
             db,
@@ -250,8 +250,8 @@ where
                     root: Node::Empty,
                     root_hash: root.to_vec(),
 
-                    cache: RefCell::new(BTreeMap::new()),
-                    passing_keys: RefCell::new(HashSet::new()),
+                    cache: RefCell::new(Vec::new()),
+                    passing_keys: RefCell::new(Vec::new()),
                     gen_keys: RefCell::new(HashSet::new()),
 
                     db,
@@ -275,10 +275,10 @@ where
     ) -> TrieResult<(Self, Vec<Vec<u8>>)> {
         let mut pt = Self {
             root: Node::Empty,
-            root_hash: hasher.digest(rlp::NULL_RLP.as_ref()),
+            root_hash: hasher.digest(rlp::NULL_RLP.as_ref()).to_vec(),
 
-            cache: RefCell::new(BTreeMap::new()),
-            passing_keys: RefCell::new(HashSet::new()),
+            cache: RefCell::new(Vec::new()),
+            passing_keys: RefCell::new(Vec::new()),
             gen_keys: RefCell::new(HashSet::new()),
 
             db,
@@ -295,14 +295,16 @@ where
         let encoded = pt.cache_node(root)?;
         pt.cache
             .borrow_mut()
-            .insert(pt.hasher.digest(&encoded), encoded);
+            .push((pt.hasher.digest(&encoded), encoded));
 
         // store data in backup db
         pt.backup_db
             .clone()
             .unwrap()
-            .insert_map(&mut pt.cache.borrow_mut())
+            .insert_map(pt.cache.into_inner())
             .map_err(|e| TrieError::DB(e.to_string()))?;
+        pt.cache = RefCell::new(vec![]);
+
         pt.backup_db
             .clone()
             .unwrap()
@@ -388,7 +390,7 @@ where
             let hash = self.hasher.digest(&node_encoded);
 
             if root_hash.eq(&hash) || node_encoded.len() >= H::LENGTH {
-                memdb.insert(hash, node_encoded).unwrap();
+                memdb.insert(hash.to_vec(), node_encoded).unwrap();
             }
         }
         let trie = PatriciaTrie::from(memdb, Arc::clone(&self.hasher), root_hash)
@@ -533,9 +535,7 @@ where
             Node::Hash(hash_node) => {
                 let borrow_hash_node = hash_node.borrow();
 
-                self.passing_keys
-                    .borrow_mut()
-                    .insert(borrow_hash_node.hash.to_vec());
+                self.passing_keys.borrow_mut().push(borrow_hash_node.hash);
                 let n = self.recover_from_db(&borrow_hash_node.hash)?;
                 self.insert_at(n, partial, value)
             }
@@ -591,8 +591,8 @@ where
                 }
             }
             Node::Hash(hash_node) => {
-                let hash = hash_node.borrow().hash.clone();
-                self.passing_keys.borrow_mut().insert(hash.clone());
+                let hash = hash_node.borrow().hash;
+                self.passing_keys.borrow_mut().push(hash);
 
                 let n = self.recover_from_db(&hash)?;
                 self.delete_at(n, partial)
@@ -656,8 +656,8 @@ where
                     }
                     // try again after recovering node from the db.
                     Node::Hash(hash_node) => {
-                        let hash = hash_node.borrow().hash.clone();
-                        self.passing_keys.borrow_mut().insert(hash.clone());
+                        let hash = hash_node.borrow().hash;
+                        self.passing_keys.borrow_mut().push(hash);
 
                         let new_node = self.recover_from_db(&hash)?;
 
@@ -703,7 +703,7 @@ where
                 }
             }
             Node::Hash(hash_node) => {
-                let n = self.recover_from_db(&hash_node.borrow().hash.clone())?;
+                let n = self.recover_from_db(&hash_node.borrow().hash)?;
                 let mut rest = self.get_path_at(n.clone(), partial)?;
                 rest.push(n);
                 Ok(rest)
@@ -715,27 +715,24 @@ where
         let encoded = self.encode_node(self.root.clone());
         let root_hash = if encoded.len() < H::LENGTH {
             let hash = self.hasher.digest(&encoded);
-            self.cache.borrow_mut().insert(hash.clone(), encoded);
-            hash
+            self.cache.borrow_mut().push((hash, encoded));
+            hash.to_vec()
         } else {
             encoded
         };
 
-        self.db
-            .insert_map(&mut self.cache.borrow_mut())
-            .map_err(|e| TrieError::DB(e.to_string()))?;
-
-        let removed_keys: Vec<Vec<u8>> = self
-            .passing_keys
-            .borrow()
-            .iter()
-            .filter(|h| !self.gen_keys.borrow().contains(*h))
-            .map(|h| h.to_vec())
-            .collect();
+        self.passing_keys
+            .borrow_mut()
+            .retain(|h| !self.gen_keys.borrow().contains(h));
 
         self.db
-            .remove_batch(&removed_keys)
+            .remove_batch(&self.passing_keys.borrow())
             .map_err(|e| TrieError::DB(e.to_string()))?;
+
+        self.db
+            .insert_map(self.cache.clone().into_inner())
+            .map_err(|e| TrieError::DB(e.to_string()))?;
+        self.cache = RefCell::new(vec![]);
 
         self.root_hash = root_hash.to_vec();
         self.gen_keys.borrow_mut().clear();
@@ -747,7 +744,7 @@ where
     fn encode_node(&self, n: Node) -> Vec<u8> {
         // Returns the hash value directly to avoid double counting.
         if let Node::Hash(hash_node) = n {
-            return hash_node.borrow().hash.clone();
+            return hash_node.borrow().hash.to_vec();
         }
 
         let data = self.encode_raw(n.clone());
@@ -757,10 +754,10 @@ where
             data
         } else {
             let hash = self.hasher.digest(&data);
-            self.cache.borrow_mut().insert(hash.clone(), data);
+            self.cache.borrow_mut().push((hash, data));
 
-            self.gen_keys.borrow_mut().insert(hash.clone());
-            hash
+            self.gen_keys.borrow_mut().insert(hash);
+            hash.to_vec()
         }
     }
 
@@ -851,7 +848,9 @@ where
             }
             _ => {
                 if r.is_data() && r.size() == H::LENGTH {
-                    Ok(Node::from_hash(r.data()?.to_vec()))
+                    Ok(Node::from_hash(
+                        r.data()?.try_into().expect("size should be H::LENGTH"),
+                    ))
                 } else {
                     Err(TrieError::InvalidData)
                 }
@@ -911,11 +910,11 @@ where
                 Ok(stream.out().to_vec())
             }
             Node::Hash(hash_node) => {
-                let hash = hash_node.borrow().hash.clone();
+                let hash = hash_node.borrow().hash;
                 let next_node = self.recover_from_db(&hash)?;
                 let data = self.cache_node(next_node)?;
-                self.cache.borrow_mut().insert(hash.clone(), data);
-                Ok(hash)
+                self.cache.borrow_mut().push((hash, data));
+                Ok(hash.to_vec())
             }
         }
     }
@@ -929,10 +928,9 @@ mod tests {
     use std::collections::{BTreeMap, HashSet};
     use std::sync::Arc;
 
-    use hasher::{Hasher, HasherKeccak};
-
     use super::{PatriciaTrie, Trie};
     use crate::db::{MemoryDB, DB};
+    use crate::{FixedHasherKeccak as HasherKeccak, Hasher};
 
     #[test]
     fn test_trie_insert() {
