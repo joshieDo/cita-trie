@@ -15,6 +15,7 @@ documentation = "https://docs.rs/cita_trie"
 parking_lot = "0.12"
 rlp = "0.5"
 tiny-keccak = "2.0.2"
+reth-rlp = { git = "https://github.com/paradigmxyz/reth" }
 
 [dev-dependencies]
 rand = "0.7"

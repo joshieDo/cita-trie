@@ -1,3 +1,4 @@
+use reth_rlp::{Encodable, Header};
 use rlp::{Prototype, Rlp, RlpStream};
 use std::cell::RefCell;
 use std::collections::HashSet;
@@ -765,10 +766,21 @@ where
             Node::Leaf(leaf) => {
                 let borrow_leaf = leaf.borrow();
 
-                let mut stream = RlpStream::new_list(2);
-                stream.append(&borrow_leaf.key.encode_compact());
-                stream.append(&borrow_leaf.value);
-                stream.out().to_vec()
+                let mut out = Vec::new();
+
+                let key = borrow_leaf.key.encode_compact();
+                let value = borrow_leaf.value.as_slice();
+
+                let header = Header {
+                    list: true,
+                    payload_length: Encodable::length(&key.as_slice()) + Encodable::length(&value),
+                };
+                header.encode(&mut out);
+
+                Encodable::encode(&key.as_slice(), &mut out);
+                Encodable::encode(&value, &mut out);
+
+                out
             }
             Node::Branch(branch) => {
                 let borrow_branch = branch.borrow();
